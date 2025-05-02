@@ -1,26 +1,29 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:task_manager_app/data/service/network_client.dart';
-import 'package:task_manager_app/data/utils/urls.dart';
+import 'package:get/get.dart';
+import 'package:task_manager_app/ui/controllers/forget_password_pin_verification_controller.dart';
 import 'package:task_manager_app/ui/screens/login_screen.dart';
 import 'package:task_manager_app/ui/screens/reset_password_screen.dart';
 import 'package:task_manager_app/ui/widgets/screen_background.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
-import 'package:task_manager_app/ui/widgets/snack_bar_message.dart';
 
+import '../widgets/snack_bar_message.dart';
 
 class ForgotPasswordPinVerificationScreen extends StatefulWidget {
   final String email;
   const ForgotPasswordPinVerificationScreen({super.key, required this.email});
 
   @override
-  State<ForgotPasswordPinVerificationScreen> createState() => _ForgotPasswordPinVerificationScreenState();
+  State<ForgotPasswordPinVerificationScreen> createState() =>
+      _ForgotPasswordPinVerificationScreenState();
 }
 
-class _ForgotPasswordPinVerificationScreenState extends State<ForgotPasswordPinVerificationScreen> {
+class _ForgotPasswordPinVerificationScreenState
+    extends State<ForgotPasswordPinVerificationScreen> {
   final TextEditingController _pinCodeTEController = TextEditingController();
-  final GlobalKey<FormState> _formKey= GlobalKey<FormState>();
-   bool _pinVerificationInProgress = false;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final ForgetPasswordPinVerificationController _forgetPinVerificationController =
+      Get.find<ForgetPasswordPinVerificationController>();
 
   @override
   Widget build(BuildContext context) {
@@ -38,11 +41,13 @@ class _ForgotPasswordPinVerificationScreenState extends State<ForgotPasswordPinV
                   'Pin Verification',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                const SizedBox(height: 4,),
-                Text('A 6 digit verification pin has been sent to your email.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey
-                ),),
+                const SizedBox(height: 4),
+                Text(
+                  'A 6 digit verification pin has been sent to your email.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+                ),
                 const SizedBox(height: 24),
                 PinCodeTextField(
                   keyboardType: TextInputType.number,
@@ -110,30 +115,38 @@ class _ForgotPasswordPinVerificationScreenState extends State<ForgotPasswordPinV
   }
 
   void _onTapSignInButton() {
-    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context)=>LoginScreen()), (pre)=>false);
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => LoginScreen()),
+      (pre) => false,
+    );
   }
 
   void _onTapSubmitButton() {
-    _verifyPin(widget.email,_pinCodeTEController.text, context);
+    _verifyPin();
   }
 
-  Future<void> _verifyPin(String email,String otp,BuildContext context) async {
-    _pinVerificationInProgress = true;
-    setState(() {});
-    final NetworkResponse response = await NetworkClient.getRequest(
-      url: Urls.recoverVerifyOtpUrl(email,otp),
+  Future<void> _verifyPin() async {
+    final bool isSuccess = await _forgetPinVerificationController.verifyPin(
+      widget.email,
+      _pinCodeTEController.text,
     );
-    _pinVerificationInProgress = false;
-    if (response.isSuccess) {
-      Navigator.push(context, MaterialPageRoute(builder: (context)=>ResetPasswordScreen(email: widget.email,otp: otp,)));
 
-
+    if (isSuccess) {
+      Get.to(
+        () => ResetPasswordScreen(
+          email: widget.email,
+          otp: _pinCodeTEController.text,
+        ),
+      );
     } else {
-      setState(() {});
-      showSnackBarMessage(context, response.errorMessage, true);
+      showSnackBarMessage(
+        context,
+        _forgetPinVerificationController.errorMessage!,
+        true,
+      );
     }
   }
-
 
   @override
   void dispose() {

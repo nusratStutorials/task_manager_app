@@ -1,12 +1,12 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:task_manager_app/data/service/network_client.dart';
-import 'package:task_manager_app/data/utils/urls.dart';
+import 'package:get/get.dart';
+import 'package:task_manager_app/ui/controllers/reset_password_controller.dart';
 import 'package:task_manager_app/ui/screens/login_screen.dart';
 import 'package:task_manager_app/ui/widgets/centered_circular_progress_indicator.dart';
 import 'package:task_manager_app/ui/widgets/screen_background.dart';
-import 'package:task_manager_app/ui/widgets/snack_bar_message.dart';
 
+import '../widgets/snack_bar_message.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String email;
@@ -21,7 +21,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final TextEditingController _newPasswordTEController = TextEditingController();
   final TextEditingController _conformNewPasswordTEController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  bool _resetPasswordInProgress = false;
+  final ResetPasswordController _resetPasswordController = Get.find<ResetPasswordController>();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -59,13 +59,17 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   decoration: InputDecoration(hintText: 'Confirm New Password'),
                 ),
                 const SizedBox(height: 16),
-                Visibility(
-                  visible: _resetPasswordInProgress == false,
-                  replacement: CenteredCircularProgressIndicator(),
-                  child: ElevatedButton(
-                    onPressed: _onTapSubmitButton,
-                    child: Text('Confirm'),
-                  ),
+                GetBuilder<ResetPasswordController>(
+                  builder: (controller) {
+                    return Visibility(
+                      visible: controller.resetPasswordInProgress == false,
+                      replacement: CenteredCircularProgressIndicator(),
+                      child: ElevatedButton(
+                        onPressed: _onTapSubmitButton,
+                        child: Text('Confirm'),
+                      ),
+                    );
+                  }
                 ),
                 const SizedBox(height: 32),
                 Center(
@@ -107,7 +111,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   void _onTapSubmitButton() {
-    _updateProfile();
+    _resetPassword();
   }
   void _onTapSignInButton() {
     Navigator.pushAndRemoveUntil(
@@ -116,42 +120,30 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       (pre) => false,
     );
   }
-  Future<void> _updateProfile() async {
+  Future<void> _resetPassword() async {
+    final bool isSuccess =  await _resetPasswordController.resetPassword(
+      widget.email,_newPasswordTEController.text,widget.otp
+    );
     if (_newPasswordTEController.text != _conformNewPasswordTEController.text) {
       showSnackBarMessage(context, 'Passwords do not match', true);
       return;
     }
-    _resetPasswordInProgress = true;
-    setState(() {});
-    Map<String, dynamic> requestBody = {
-      "email": widget.email.trim(),
-      "OTP": widget.otp.trim(),
-      "password": _newPasswordTEController.text,
-    };
-    NetworkResponse response = await NetworkClient.postRequest(
-      url: Urls.recoverResetPasswordUrl,
-      body: requestBody,
-    );
-    _resetPasswordInProgress = false;
-    setState(() {});
-    if (response.isSuccess) {
+
+    if (isSuccess) {
       showSnackBarMessage(context, 'Password reset successfully!');
       await Future.delayed(Duration(seconds: 2));
       if(mounted){
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => LoginScreen()),
-              (pre) => false,
-        );
+        Get.offAll(() => const LoginScreen());
       }
 
     } else {
-      showSnackBarMessage(context, response.errorMessage, true);
+      showSnackBarMessage(context, _resetPasswordController.errorMessage!, true);
     }
   }
 
   @override
   void dispose() {
+    // TODO: implement dispose
     _newPasswordTEController.dispose();
     _conformNewPasswordTEController.dispose();
     super.dispose();

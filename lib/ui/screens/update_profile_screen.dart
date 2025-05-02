@@ -1,17 +1,15 @@
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:task_manager_app/data/models/user_model.dart';
-import 'package:task_manager_app/data/service/network_client.dart';
-import 'package:task_manager_app/data/utils/urls.dart';
 import 'package:task_manager_app/ui/controllers/auth_controller.dart';
+import 'package:task_manager_app/ui/controllers/update_profile_controller.dart';
 import 'package:task_manager_app/ui/widgets/centered_circular_progress_indicator.dart';
 import 'package:task_manager_app/ui/widgets/screen_background.dart';
-import 'package:task_manager_app/ui/widgets/snack_bar_message.dart';
 import 'package:task_manager_app/ui/widgets/tm_app_bar.dart';
 import 'package:image_picker/image_picker.dart';
 
-
+import '../widgets/snack_bar_message.dart';
 
 class UpdateProfileScreen extends StatefulWidget {
   final VoidCallback? onProfileUpdated;
@@ -30,10 +28,11 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final ImagePicker _imagePicker = ImagePicker();
   XFile? _pickedImage;
-  bool _updateProfileInProgress = false;
+  final UpdateProfileController _updateProfileController = Get.find<UpdateProfileController>();
 
   @override
   void initState() {
+    // TODO: implement initState
     super.initState();
     UserModel userModel = AuthController.userModel!;
     _emailTEController.text = userModel.email;
@@ -114,13 +113,17 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
                     decoration: InputDecoration(hintText: 'Password'),
                   ),
                   const SizedBox(height: 16),
-                  Visibility(
-                    visible: _updateProfileInProgress == false,
-                    replacement: CenteredCircularProgressIndicator(),
-                    child: ElevatedButton(
-                      onPressed: _onTapSubmitButton,
-                      child: const Icon(Icons.arrow_circle_right_outlined),
-                    ),
+                  GetBuilder<UpdateProfileController>(
+                    builder: (controller) {
+                      return Visibility(
+                        visible: controller.updateProfileInProgress == false,
+                        replacement: CenteredCircularProgressIndicator(),
+                        child: ElevatedButton(
+                          onPressed: _onTapSubmitButton,
+                          child: const Icon(Icons.arrow_circle_right_outlined),
+                        ),
+                      );
+                    }
                   ),
                 ],
               ),
@@ -178,40 +181,15 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
   }
 
   Future<void> _updateProfile() async {
-    _updateProfileInProgress = true;
-    setState(() {});
-    Map<String, dynamic> requestBody = {
-      "email": _emailTEController.text.trim(),
-      "firstName": _firstNameTEController.text.trim(),
-      "lastName": _lastNameTEController.text.trim(),
-      "mobile": _mobileTEController.text.trim(),
-    };
-    if (_passwordTEController.text.isNotEmpty) {
-      requestBody['password'] = _passwordTEController.text;
-    }
-    if (_pickedImage != null) {
-      List<int> imageBytes = await _pickedImage!.readAsBytes();
-      String encodedImage= base64Encode(imageBytes);
-      requestBody['photo']=encodedImage;
-    }
+final bool isSuccess = await _updateProfileController.updateProfile(_emailTEController.text.trim(),_firstNameTEController.text.trim(),_lastNameTEController.text.trim(),_mobileTEController.text.trim(),_passwordTEController.text,_pickedImage);
 
-    NetworkResponse response = await NetworkClient.postRequest(
-      url: Urls.updateProfileUrl,
-      body: requestBody,
-    );
-    _updateProfileInProgress = false;
-    setState(() {});
-    if (response.isSuccess) {
-      if (_pickedImage == null) {
-        requestBody['photo']=AuthController.userModel?.photo;
-      }
-      final updatedUser = UserModel.fromJson(requestBody);
-      AuthController.saveUserInformation(AuthController.token!,updatedUser);
+
+    if (isSuccess) {
       _passwordTEController.clear();
       showSnackBarMessage(context, 'User data updated successfully!');
       widget.onProfileUpdated?.call();
     } else {
-      showSnackBarMessage(context, response.errorMessage, true);
+      showSnackBarMessage(context, _updateProfileController.errorMessage!, true);
     }
   }
 }
